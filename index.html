@@ -26,6 +26,72 @@ html.pane #splB,html.pane #splB2,html.pane #bkNag,html.pane #stNote,html.pane #u
 <style id="geocss">#geo{padding-top:4px}#geoTools,#geoActs{gap:5px;margin:6px 0 0}#geoTools button,#geoActs button{padding:6px 8px;font-size:13px}#geoSt{min-height:20px;margin:6px 2px}#geoBoard{width:100%;height:320px;direction:ltr;touch-action:none;background:#fff;border-radius:8px;box-shadow:0 0 0 1px var(--line);overflow:hidden;position:relative}#geoBoard svg{touch-action:none;display:block}#calc.mini #geo{display:none!important}</style>
 <style id="foldskin">.fold.fsk{background:transparent!important;padding:2px 0!important;display:flex;justify-content:center}.fsk svg{width:100%;height:84px;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}.fsk svg *{vector-effect:none}.grid.list .bk .fold.fsk svg{height:56px}.bk .mn{z-index:5}</style>
 <style id="fitfix">.panel,#dlg,#pmenu{max-width:min(96vw,calc(100% - 12px))!important}#pmenu{max-height:calc(100% - 16px);overflow:auto}</style>
+<script id="errlogjs">
+/* ===== سجل أخطاء على الشاشة (للتجربة): زر 🐞 صغير، بيحمرّ لما يصير خطأ. اضغطه لتشوف التفاصيل وتنسخها ===== */
+(()=>{if(window.__ERRLOG)return;
+const KEY='nberrlog',MAX=40,TAPMAX=25,L=[];let trace=false,badge=null,panel=null,list=null,tbtn=null,seq=0;
+const hhmm=()=>new Date().toTimeString().slice(0,8);
+try{const s=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(s))s.slice(-MAX).forEach(x=>{x.old=1;x.q=++seq;L.push(x)})}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(L.filter(x=>x.k!=='tap').slice(-MAX).map(x=>({t:x.t,k:x.k,m:x.m,w:x.w,s:x.s,n:x.n}))))}catch(e){}};
+const add=(k,m,w,s)=>{try{
+  m=String(m==null?'':m).slice(0,400);w=String(w||'');
+  if(k==='error'&&/ResizeObserver loop/.test(m))return;
+  const last=L[L.length-1];
+  if(k!=='tap'&&last&&!last.old&&last.k===k&&last.m===m&&last.w===w){last.n=(last.n||1)+1;last.t=hhmm()}
+  else{L.push({t:hhmm(),k,m,w,s:String(s||'').split('\n').slice(0,6).join('\n').slice(0,700),n:1,q:++seq});
+    if(k==='tap'){const taps=L.filter(x=>x.k==='tap');if(taps.length>TAPMAX)L.splice(L.indexOf(taps[0]),1)}
+    else if(L.filter(x=>x.k!=='tap').length>MAX)L.splice(L.findIndex(x=>x.k!=='tap'),1)}
+  save();ui();return L[L.length-1]}catch(e){}};
+const cnt=()=>L.filter(x=>!x.old&&(x.k==='error'||x.k==='promise'||x.k==='handler'||x.k==='console')).reduce((a,x)=>a+(x.n||1),0);
+const LBL={error:'خطأ',promise:'وعد مرفوض',handler:'خطأ بمعالج القلم/اللمس',console:'console.error',silent:'خطأ صامت (ما بيظهر للمستخدم)',tap:'لمسة'};
+const fmt=x=>'['+x.t+'] '+(LBL[x.k]||x.k)+(x.n>1?' ×'+x.n:'')+(x.old?' (جلسة سابقة)':'')+'\n'+x.m+(x.w?'\n@ '+x.w:'')+(x.s?'\n'+x.s:'');
+const head=()=>'UA: '+navigator.userAgent+'\nشاشة: '+innerWidth+'x'+innerHeight+' dpr='+(devicePixelRatio||1)+'\nنسخة التطبيق: '+((document.querySelector('meta[name=app-version]')||{}).content||'?');
+const ui=()=>{if(!badge)return;const n=cnt();badge.textContent=n?'🐞 '+n:'🐞';badge.classList.toggle('bad',n>0);if(panel&&!panel.hidden)render()};
+const render=()=>{if(!list)return;list.textContent='';
+  const rows=L.slice().sort((a,b)=>b.q-a.q);
+  if(!rows.length){const d=document.createElement('div');d.className='e';d.textContent='ما في أخطاء مسجّلة.';list.append(d);return}
+  rows.forEach(x=>{const d=document.createElement('div');d.className='e '+x.k+(x.old?' old':'');const b=document.createElement('b');b.textContent='['+x.t+'] '+(LBL[x.k]||x.k)+(x.n>1?' ×'+x.n:'')+(x.old?' (جلسة سابقة)':'');d.append(b,document.createTextNode('\n'+x.m+(x.w?'\n@ '+x.w:'')+(x.s?'\n'+x.s:'')));list.append(d)})};
+const copy=async()=>{const txt=head()+'\n\n'+L.slice().sort((a,b)=>b.q-a.q).map(fmt).join('\n\n');
+  try{await navigator.clipboard.writeText(txt);return true}catch(e){}
+  try{const t=document.createElement('textarea');t.value=txt;t.style.cssText='position:fixed;opacity:0;top:0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();return ok}catch(e){return false}};
+const tx=n=>{try{const b=n.closest&&n.closest('button,a,[role=button],label,summary');if(!b)return'';const s=((b.textContent||'').trim().replace(/\s+/g,' ')||b.title||'').slice(0,18);return s?' "'+s+'"':''}catch(e){return''}};
+const dn=n=>{if(!n||!n.tagName)return String(n);let s=n.tagName.toLowerCase()+(n.id?'#'+n.id:'')+tx(n);try{if(typeof n.className==='string'&&n.className.trim())s+='.'+n.className.trim().split(/\s+/).slice(0,2).join('.');if(n.disabled)s+=' [disabled]';if(getComputedStyle(n).pointerEvents==='none')s+=' [pe:none]'}catch(e){}return s};
+const build=()=>{
+  const st=document.createElement('style');st.textContent=
+  '#elb{position:fixed;z-index:2147483000;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);min-width:34px;height:34px;padding:0 10px;border-radius:17px;border:0;font:600 13px system-ui,sans-serif;background:rgba(60,60,67,.55);color:#fff;opacity:.5;touch-action:manipulation}'+
+  '#elb.bad{background:#d62d3a;opacity:1}'+
+  '#elp{position:fixed;z-index:2147483001;left:0;right:0;bottom:0;max-height:72vh;display:flex;flex-direction:column;background:#fff;color:#111;border-top:2px solid #d62d3a;box-shadow:0 -6px 24px rgba(0,0,0,.3);font:13px system-ui,sans-serif;direction:rtl}'+
+  '#elp[hidden]{display:none}#elp .h{display:flex;gap:6px;align-items:center;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid #ddd}'+
+  '#elp .h strong{flex:1;min-width:90px}#elp button{font:inherit;padding:7px 12px;border-radius:8px;border:1px solid #bbb;background:#f4f4f6;color:#111}#elp button.on{background:#0a64d6;color:#fff;border-color:#0a64d6}'+
+  '#elp .b{overflow:auto;padding:4px 10px 12px;-webkit-overflow-scrolling:touch}'+
+  '#elp .e{border-bottom:1px solid #eee;padding:7px 0;direction:ltr;text-align:left;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}'+
+  '#elp .e b{color:#d62d3a}#elp .e.old{opacity:.55}#elp .e.tap b{color:#0a64d6}#elp .e.silent b{color:#b7791f}';
+  document.head.append(st);
+  badge=document.createElement('button');badge.id='elb';badge.type='button';badge.textContent='🐞';badge.setAttribute('aria-label','سجل الأخطاء');
+  panel=document.createElement('div');panel.id='elp';panel.hidden=true;
+  const h=document.createElement('div');h.className='h';const ti=document.createElement('strong');ti.textContent='سجل الأخطاء';
+  const mk=(t,f)=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.onclick=f;return b};
+  const cb=mk('نسخ الكل',async e=>{const ok=await copy();e.target.textContent=ok?'تم النسخ ✓':'ما اننسخ';setTimeout(()=>e.target.textContent='نسخ الكل',1600)});
+  tbtn=mk('تتبع اللمس: مطفي',()=>{trace=!trace;tbtn.textContent='تتبع اللمس: '+(trace?'شغّال':'مطفي');tbtn.classList.toggle('on',trace)});
+  const cl=mk('مسح',()=>{L.length=0;save();ui();render()});
+  const x=mk('✕',()=>{panel.hidden=true});
+  h.append(ti,cb,tbtn,cl,x);list=document.createElement('div');list.className='b';panel.append(h,list);
+  badge.onclick=()=>{panel.hidden=!panel.hidden;if(!panel.hidden)render()};
+  document.body.append(badge,panel);ui()};
+if(document.body)build();else document.addEventListener('DOMContentLoaded',build);
+addEventListener('error',e=>{if(e.target&&e.target!==window)return;add('error',e.message,((e.filename||'').split('/').pop()||'')+':'+(e.lineno||0)+':'+(e.colno||0),e.error&&e.error.stack)});
+addEventListener('unhandledrejection',e=>{const r=e.reason;add('promise',r&&r.message||String(r),'',r&&r.stack)});
+const ce=console.error;console.error=function(){try{add('console',[].map.call(arguments,a=>a&&a.message?a.message:typeof a==='object'?JSON.stringify(a):String(a)).join(' '))}catch(_){}return ce.apply(console,arguments)};
+const inUI=t=>t&&t.closest&&t.closest('#elp,#elb');
+document.addEventListener('pointerdown',e=>{if(!trace||inUI(e.target))return;let top=null;try{top=document.elementFromPoint(e.clientX,e.clientY)}catch(_){}
+  add('tap',e.pointerType+' @'+Math.round(e.clientX)+','+Math.round(e.clientY),'target='+dn(e.target)+(top!==e.target?'  top='+dn(top):''))},true);
+const watch=en=>{if(!en)return;let c=0;const mo=new MutationObserver(rs=>{rs.forEach(r=>{const t=r.target.nodeType===1?r.target:r.target.parentElement;if(!(t&&t.closest&&t.closest('#elp,#elb')))c++})});
+  mo.observe(document.body,{subtree:true,childList:true,attributes:true,characterData:true});
+  setTimeout(()=>{mo.disconnect();en.w=(en.w||'')+'\n→ بعد 0.45 ثانية: '+(c?'الصفحة تغيّرت ('+c+' تعديل)':'ولا تغيير بالصفحة (الزر ما عمل شي ظاهر)');save();ui()},450)};
+document.addEventListener('click',e=>{if(!trace||inUI(e.target))return;watch(add('tap','click','target='+dn(e.target)))},true);
+window.__ERRLOG={add,get list(){return L}};
+})();
+</script>
 <style id="appcss">
 :root{--bg:#f3f6fb;--card:#ffffff;--elev:#eaf0f8;--ink:#1c2433;--mute:#66738a;--line:#d9e1ee;--accent:#3b82f6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#f3f6fb;--card:#ffffff;--elev:#eaf0f8;--ink:#1c2433;--mute:#66738a;--line:#d9e1ee;--accent:#3b82f6}}
@@ -3371,19 +3437,16 @@ function recog(it){
   /* v13.35: تقاطع ذاتي (حرف «لا»، حرف e، خربشة...) ما بنحوّله لشكل، ونجمة خماسية (متقاطعة أو مفرّغة) بتتحوّل لنجمة منتظمة */
   const segX=(p,q,r,t)=>{const o=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);const d1=o(p,q,r),d2=o(p,q,t),d3=o(r,t,p),d4=o(r,t,q);return d1*d2<0&&d3*d4<0};
   const selfX=()=>{for(let i=0;i<n-1;i++)for(let j=i+8;j<n-1;j++)if(segX(P[i],P[i+1],P[j],P[j+1]))return true;return false};
-  /* v13.38: نجمة بأي عدد رؤوس: متقاطعة {k/m} (k=5..12، m>=2 وبدون قاسم مشترك، بنَفَس واحد) أو مفرّغة (2n رأس بأنصاف أقطار متناوبة، 8..24) */
-  const starFit=V0=>{let V=V0.map(q=>[q[0],q[1]]);{const D=dg,W=[];V.forEach(v=>{const l=W[W.length-1];if(l&&Math.hypot(v[0]-l[0],v[1]-l[1])<.12*D){l[0]=(l[0]+v[0])/2;l[1]=(l[1]+v[1])/2}else W.push(v)});while(W.length>2&&Math.hypot(W[0][0]-W[W.length-1][0],W[0][1]-W[W.length-1][1])<.12*D){const l=W.pop();W[0][0]=(W[0][0]+l[0])/2;W[0][1]=(W[0][1]+l[1])/2}V=W}const k=V.length;if(k<5||k>24)return null;let cx=0,cy=0;V.forEach(q=>{cx+=q[0];cy+=q[1]});cx/=k;cy/=k;
-    const r=V.map(q=>Math.hypot(q[0]-cx,q[1]-cy)),an=V.map(q=>Math.atan2(q[1]-cy,q[0]-cx)),st=[],T=2*Math.PI;
-    for(let i=0;i<k;i++){let d=an[(i+1)%k]-an[i];while(d>Math.PI)d-=T;while(d<-Math.PI)d+=T;st.push(d)}
-    const sg=st.reduce((x,v)=>x+v,0),dir=sg>0?1:-1,m=Math.round(Math.abs(sg)/T),mean=a=>a.reduce((x,v)=>x+v,0)/a.length,gc=(a,b)=>b?gc(b,a%b):a;
-    if(m<1||(m===1?(k<8||k%2):(k>12||2*m>=k||gc(k,m)!==1)))return null;
-    const step=T*m/k;if(st.some(d=>Math.abs(d*dir-step)>(m===1?.45*T/k:Math.max(.25,.4*T/k))))return null;
-    if(m>1){let c=0;for(let i=0;i<k;i++)for(let j=i+2;j<k;j++)if(!(i===0&&j===k-1)&&segX(V[i],V[(i+1)%k],V[j],V[(j+1)%k]))c++;if(c<.6*k*(m-1))return null}
-    let sx=0,sy=0;for(let i=0;i<k;i++){const t=an[i]-i*dir*step;sx+=Math.cos(t);sy+=Math.sin(t)}const t0=Math.atan2(sy,sx),out=[];
-    if(m>1){const mm=mean(r);if(r.some(v=>Math.abs(v-mm)>.3*mm))return null;for(let i=0;i<k;i++){const t=t0+i*dir*step;out.push([cx+mm*Math.cos(t),cy+mm*Math.sin(t)])}return out}
+  const starFit=V0=>{let V=V0.map(q=>[q[0],q[1]]);{const D=dg,W=[];V.forEach(v=>{const l=W[W.length-1];if(l&&Math.hypot(v[0]-l[0],v[1]-l[1])<.12*D){l[0]=(l[0]+v[0])/2;l[1]=(l[1]+v[1])/2}else W.push(v)});while(W.length>2&&Math.hypot(W[0][0]-W[W.length-1][0],W[0][1]-W[W.length-1][1])<.12*D){const l=W.pop();W[0][0]=(W[0][0]+l[0])/2;W[0][1]=(W[0][1]+l[1])/2}V=W}const k=V.length;if(k!==5&&k!==10)return null;let cx=0,cy=0;V.forEach(q=>{cx+=q[0];cy+=q[1]});cx/=k;cy/=k;
+    const r=V.map(q=>Math.hypot(q[0]-cx,q[1]-cy)),an=V.map(q=>Math.atan2(q[1]-cy,q[0]-cx)),st=[];
+    for(let i=0;i<k;i++){let d=an[(i+1)%k]-an[i];while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;st.push(d)}
+    const dir=st.reduce((x,v)=>x+v,0)>0?1:-1,want=(k===5?144:36)*Math.PI/180,mean=a=>a.reduce((x,v)=>x+v,0)/a.length;
+    if(st.some(d=>Math.abs(d*dir-want)>(k===5?.5:.28)))return null;
+    const step=k===5?4*Math.PI/5:Math.PI/5;let sx=0,sy=0;for(let i=0;i<k;i++){const t=an[i]-i*dir*step;sx+=Math.cos(t);sy+=Math.sin(t)}const t0=Math.atan2(sy,sx),out=[];
+    if(k===5){const m=mean(r);if(r.some(v=>Math.abs(v-m)>.3*m))return null;for(let i=0;i<5;i++){const t=t0+i*dir*step;out.push([cx+m*Math.cos(t),cy+m*Math.sin(t)])}return out}
     const ev=r.filter((v,i)=>i%2===0),od=r.filter((v,i)=>i%2===1),me=mean(ev),mo=mean(od),R1=Math.max(me,mo),R2=Math.min(me,mo),ro=me>=mo?0:1;
     if(R2/R1<.3||R2/R1>.78||ev.some(v=>Math.abs(v-me)>.3*me)||od.some(v=>Math.abs(v-mo)>.3*mo))return null;
-    for(let i=0;i<k;i++){const t=t0+i*dir*step,rr=(i%2===ro)?R1:R2;out.push([cx+rr*Math.cos(t),cy+rr*Math.sin(t)])}return out};
+    for(let i=0;i<10;i++){const t=t0+i*dir*step,rr=(i%2===ro)?R1:R2;out.push([cx+rr*Math.cos(t),cy+rr*Math.sin(t)])}return out};
   /* v13.31: زاوية (خطين متصلين) وجذر تربيعي: شكل مفتوح بزوايا حادة، بيتحوّل لخطوط مستقيمة (بنفس نقاط 's' فبيتحرك ويدور متل القوس) */
   const dens=V=>{const o=[],pr=PR,mk=(x,y)=>[x,y,pr];for(let i=0;i<V.length-1;i++){const u=V[i],v=V[i+1],l=Math.hypot(v[0]-u[0],v[1]-u[1]),m=Math.max(1,Math.ceil(l/.004));for(let j=0;j<m;j++){const t=j/m;o.push(mk(u[0]+(v[0]-u[0])*t,u[1]+(v[1]-u[1])*t))}}o.push(mk(V[V.length-1][0],V[V.length-1][1]));return o};
   const openPoly=cross=>{
@@ -3398,7 +3461,7 @@ function recog(it){
       return{ix,e:Math.sqrt(prev[m-1]/m)/dg}};
     /* خط مناسب لنقاط بين فهرسين (بدون هامش جنب الزوايا المدوّرة) */
     const line=(i,j,mi,mj)=>{const a0=i+mi,b0=j-mj;let n=0,cx=0,cy=0;for(let t=a0;t<=b0;t++){cx+=P[t][0];cy+=P[t][1];n++}if(n<2)return null;cx/=n;cy/=n;let sxx=0,syy=0,sxy=0;for(let t=a0;t<=b0;t++){const u=P[t][0]-cx,v=P[t][1]-cy;sxx+=u*u;syy+=v*v;sxy+=u*v}const th=.5*Math.atan2(2*sxy,sxx-syy);return{cx,cy,ux:Math.cos(th),uy:Math.sin(th)}};
-    const verts=(ix,et=0)=>{const K=ix.length-1,L=[];for(let k=0;k<K;k++){const g=ix[k+1]-ix[k],mg=Math.max(1,Math.floor(.2*g)),eg=Math.floor(et*g);L.push(line(ix[k],ix[k+1],k?mg:eg,k<K-1?mg:eg))}
+    const verts=ix=>{const K=ix.length-1,L=[];for(let k=0;k<K;k++){const g=ix[k+1]-ix[k],mg=Math.max(1,Math.floor(.2*g));L.push(line(ix[k],ix[k+1],k?mg:0,k<K-1?mg:0))}
       if(L.some(x=>!x))return null;
       const proj=(q,l)=>{const t=(q[0]-l.cx)*l.ux+(q[1]-l.cy)*l.uy;return[l.cx+l.ux*t,l.cy+l.uy*t]};
       const V=[proj(P[0],L[0])];
@@ -3407,22 +3470,11 @@ function recog(it){
         V.push([v[0],v[1]])}
       V.push(proj(P[m-1],L[K-1]));return V};
     const ln=(u,v)=>Math.hypot(v[0]-u[0],v[1]-u[1]);
-    /* v13.38: أي رسمة من خطوط مستقيمة (3-8 أضلاع): زوايا مدوّرة بخط اليد (بنتجاهل حوالين الرؤوس الحادة ≥75° بس؛ الزوايا اللطيفة بتنحسب كاملة)، وخطاطيف قصيرة بطرفي الخط بتنشال، والمنحنيات بتطلع برا */
-    const pf=()=>{for(const K of[3,4,5,6,7,8]){const F=fit(K);if(F.e>.03)continue;const V=verts(F.ix,.08);if(!V)continue;
-      const hk=.07*dg;while(V.length>3&&ln(V[0],V[1])<hk)V.shift();while(V.length>3&&ln(V[V.length-2],V[V.length-1])<hk)V.pop();
-      const n=V.length-1;if(n<3)continue;let bad=false;
-      for(let i=0;i<n;i++){if(ln(V[i],V[i+1])<(i===0||i===n-1?.07:.09)*dg)bad=true;if(i>0&&ang(V[i-1],V[i],V[i+1])<(K>5?55:38))bad=true}
-      if(bad)continue;
-      let ok=0,tot=0,far=false;const zr=V.map((v,i)=>{if(!i||i===n)return .05*dg;const a=ang(V[i-1],v,V[i+1]);return a<75?0:.05*dg*Math.min(1,a/90)}),tl=.01*dg;
-      P.forEach(q=>{let nr=false,d=1e9;V.forEach((v,i)=>{if(ln(q,v)<zr[i])nr=true});for(let i=0;i<n;i++)d=Math.min(d,dseg(q,V[i],V[i+1]));if(nr){if(d>.08*dg)far=true}else{tot++;if(d<tl)ok++}});
-      if(far||ok<.94*tot)continue;
-      for(let i=0;i<n;i++){const dx=V[i+1][0]-V[i][0],dy=V[i+1][1]-V[i][1],t=Math.abs(Math.atan2(dy,dx))*180/Math.PI;if(t<7||t>173)V[i+1][1]=V[i][1];else if(Math.abs(t-90)<7)V[i+1][0]=V[i][0]}
-      return{kind:'poly',e:F.e,pts:dens(V)}}return null};
     /* خط بيقطع حاله (حرف «لا» مثلاً): نفس الرسمة بخطوط مستقيمة وزوايا حادة وبيضل التقاطع */
     if(cross){for(const K of[3,4,5]){const F=fit(K);if(F.e>.03)continue;const V=verts(F.ix);if(!V)continue;
         let bad=false;for(let i=0;i<K;i++){const l=ln(V[i],V[i+1]);if(l<(i===0||i===K-1?.06:.12)*dg)bad=true}if(bad)continue;
         for(let i=0;i<K;i++){const dx=V[i+1][0]-V[i][0],dy=V[i+1][1]-V[i][1],t=Math.abs(Math.atan2(dy,dx))*180/Math.PI;if(t<6||t>174)V[i+1][1]=V[i][1];else if(Math.abs(t-90)<6)V[i+1][0]=V[i][0]}
-        return{kind:'cross',e:F.e,pts:dens(V)}}return pf()}
+        return{kind:'cross',e:F.e,pts:dens(V)}}return null}
     /* جذر: (تيك) + نزول + صعود + خط أفقي */
     for(const K of[4,3]){const F=fit(K);if(F.e>.035)continue;const V=verts(F.ix);if(!V)continue;const o=K-3,S=V[o],B=V[o+1],T=V[o+2],E=V[o+3],up=ln(B,T),dn=ln(S,B),bar=E[0]-T[0];
       if(bar<.2*dg||Math.abs(E[1]-T[1])>.5*bar)continue;
@@ -3438,7 +3490,14 @@ function recog(it){
         if(Math.abs(tn-90)<10){const ux=(B[0]-A[0])/ln(A,B),uy=(B[1]-A[1])/ln(A,B),cr=ux*(C[1]-B[1])-uy*(C[0]-B[0]),sg=cr>=0?1:-1;C[0]=B[0]-sg*uy*l1;C[1]=B[1]+sg*ux*l1}
         else{dx=C[0]-B[0];dy=C[1]-B[1];t=Math.abs(Math.atan2(dy,dx))*180/Math.PI;if(t<6||t>174)C[1]=B[1];else if(Math.abs(t-90)<6)C[0]=B[0]}
         return{kind:'angle',e:F.e,pts:dens([A,B,C])}}}}}
-    {const X=pf();if(X)return X}
+    /* v13.37: أي شكل من خطوط مستقيمة (Z، N، W، M، درج، موجة مربعة...): 3-6 أضلاع، كل زاوية حادة (≥38°) والخطأ صغير؛ المنحنيات الناعمة بتطلع برا لأن زواياها صغيرة */
+    for(const K of[3,4,5,6]){const F=fit(K);if(F.e>.013)continue;const V=verts(F.ix);if(!V)continue;
+      /* لازم تقريباً كل النقاط (≥94%) قريبة من الأضلاع المستقيمة؛ المنحنيات الناعمة (S، موجة...) بتطلع برا */
+      {let ok=0;const tol=.01*dg;P.forEach(q=>{let d=1e9;for(let i=0;i<K;i++)d=Math.min(d,dseg(q,V[i],V[i+1]));if(d<tol)ok++});if(ok<.94*P.length)continue}
+      let bad=false;for(let i=0;i<K;i++){const l=ln(V[i],V[i+1]);if(l<(i===0||i===K-1?.07:.1)*dg)bad=true;if(i>0&&ang(V[i-1],V[i],V[i+1])<38)bad=true}
+      if(bad)continue;
+      for(let i=0;i<K;i++){const dx=V[i+1][0]-V[i][0],dy=V[i+1][1]-V[i][1],t=Math.abs(Math.atan2(dy,dx))*180/Math.PI;if(t<7||t>173)V[i+1][1]=V[i][1];else if(Math.abs(t-90)<7)V[i+1][0]=V[i][0]}
+      return{kind:'poly',e:F.e,pts:dens(V)}}
     return null};
   /* ١) خط مستقيم: شكل مفتوح وانحرافه عن الوتر صغير */
   if(chord>.35*dg){
@@ -3448,7 +3507,6 @@ function recog(it){
       if(t<6||t>174)e[1]=a[1];else if(Math.abs(t-90)<6)e[0]=a[0];
       return fin('l',[[a[0],a[1]],e])}
     const PC=openPoly();if(PC&&PC.kind==='root')return fin('s',PC.pts);
-    {const X=curveFit(P,dg,PR,0);if(X)return fin('s',X)}
     /* قوس: ملاءمة دائرة للشكل المفتوح */
     {let m0=0,m1=0;P.forEach(q=>{m0+=q[0];m1+=q[1]});m0/=n;m1/=n;let Suu=0,Suv=0,Svv=0,Su3=0,Sv3=0,Suvv=0,Svuu=0;
       P.forEach(q=>{const u=q[0]-m0,v=q[1]-m1;Suu+=u*u;Suv+=u*v;Svv+=v*v;Su3+=u*u*u;Sv3+=v*v*v;Suvv+=u*v*v;Svuu+=v*u*u});
@@ -3460,7 +3518,6 @@ function recog(it){
           if(Math.abs(sw)>.5&&Math.abs(sw)<5.9){const M=Math.max(16,Math.round(Math.abs(sw)*14)),pr=PR,out=[];
             for(let i=0;i<=M;i++){const t=a0+sw*i/M;const q=[cx+R*Math.cos(t),cy+R*Math.sin(t)];if(pr!==undefined)q.push(pr);out.push(q)}
             return fin('s',out)}}}}
-    if(!PC){const X=curveFit(P,dg,PR,1);if(X)return fin('s',X)}
     if(PC)return fin('s',PC.pts);
     return false}
   /* ٢) شكل مغلق: نبحث عن الزوايا */
@@ -3576,79 +3633,6 @@ document.addEventListener('pointerdown',e=>{const z=$('lzbar');if(!z.hidden&&!e.
 
 /* v31: unified new-notebook sheet */
 
-/* v13.39: ∪ ∩ ⊂ ⊃ بتتثبّت حتى لو مايلين (tryU + المحور المقدّر). v13.38 (جزء 20b): اتحاد ∪ / تقاطع ∩ (وجنبهم ⊂ ⊃)، حرف S (قوسين متماسّين)، وقوس بيضوي (حرف C بخط اليد). بيُنادى من recog (جزء 20): curveFit(P,dg,PR,mode): mode 0 = ∪∩⊂⊃ وS، mode 1 = قوس بيضوي. بيرجّع نقاط جاهزة أو null */
-function cvRot(q,k){return k===0?[q[0],q[1]]:k===1?[-q[0],-q[1]]:k===2?[q[1],-q[0]]:[-q[1],q[0]]}
-function cvUnrot(q,k){return k===0?[q[0],q[1]]:k===1?[-q[0],-q[1]]:k===2?[-q[1],q[0]]:[q[1],-q[0]]}
-function curveFit(P,dg,PR,mode){
-  const n=P.length,T=2*Math.PI,wr=d=>{while(d>Math.PI)d-=T;while(d<-Math.PI)d+=T;return d};
-  if(n<30)return null;
-  const done=pts=>{if(PR!==undefined)pts.forEach(q=>q.push(PR));return pts};
-  const dseg=(q,u,v)=>{const dx=v[0]-u[0],dy=v[1]-u[1],l2=dx*dx+dy*dy||1e-12;let t=((q[0]-u[0])*dx+(q[1]-u[1])*dy)/l2;t=Math.max(0,Math.min(1,t));return Math.hypot(q[0]-u[0]-t*dx,q[1]-u[1]-t*dy)};
-  const cover=(M,tol,PP)=>{PP=PP||P;let ok=0;PP.forEach(q=>{let d=1e9;for(let i=0;i<M.length-1;i++)d=Math.min(d,dseg(q,M[i],M[i+1]));if(d<tol)ok++});return ok/PP.length};
-  /* دائرة بأصغر مربعات (Kasa) */
-  const circ=Q=>{const N=Q.length;let m0=0,m1=0;Q.forEach(q=>{m0+=q[0];m1+=q[1]});m0/=N;m1/=N;let a=0,b=0,c=0,d=0,e=0,f=0,g=0;
-    Q.forEach(q=>{const u=q[0]-m0,v=q[1]-m1;a+=u*u;b+=u*v;c+=v*v;d+=u*u*u;e+=v*v*v;f+=u*v*v;g+=v*u*u});
-    const det=a*c-b*b,r1=.5*(d+f),r2=.5*(e+g);if(Math.abs(det)<1e-14)return null;
-    const uc=(r1*c-r2*b)/det,vc=(a*r2-b*r1)/det,cx=m0+uc,cy=m1+vc,R=Math.sqrt(uc*uc+vc*vc+(a+c)/N);let er=0;Q.forEach(q=>{er+=Math.abs(Math.hypot(q[0]-cx,q[1]-cy)-R)});return{cx,cy,R,er:er/N/R}};
-  const swp=(Q,cx,cy)=>{let s=0,pa=Math.atan2(Q[0][1]-cy,Q[0][0]-cx);for(let i=1;i<Q.length;i++){const t=Math.atan2(Q[i][1]-cy,Q[i][0]-cx);s+=wr(t-pa);pa=t}return s};
-  if(mode===1){
-    /* قوس بيضوي (محاوره ممكن تكون مايلة): أصغر مربعات لـ A·u²+C·v²+D·u+E·v=1 بعد تدوير وتطبيع */
-    let mx=0,my=0;P.forEach(q=>{mx+=q[0];my+=q[1]});mx/=n;my/=n;let best=null;
-    for(let a=0;a<180;a+=15){const th=a*Math.PI/180,c=Math.cos(th),s=Math.sin(th),Q=P.map(q=>{const x=(q[0]-mx)/dg,y=(q[1]-my)/dg;return[x*c+y*s,-x*s+y*c]});
-      const G=[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]];
-      Q.forEach(q=>{const f=[q[0]*q[0],q[1]*q[1],q[0],q[1]];for(let i=0;i<4;i++){for(let j=0;j<4;j++)G[i][j]+=f[i]*f[j];G[i][4]+=f[i]}});
-      let ok=true;for(let i=0;i<4&&ok;i++){let p=i;for(let r=i+1;r<4;r++)if(Math.abs(G[r][i])>Math.abs(G[p][i]))p=r;if(Math.abs(G[p][i])<1e-12){ok=false;break}[G[i],G[p]]=[G[p],G[i]];
-        for(let r=0;r<4;r++)if(r!==i){const k=G[r][i]/G[i][i];for(let j=i;j<5;j++)G[r][j]-=k*G[i][j]}}
-      if(!ok)continue;const A=G[0][4]/G[0][0],C=G[1][4]/G[1][1],D=G[2][4]/G[2][2],E=G[3][4]/G[3][3];if(!(A>0&&C>0))continue;
-      const uc=-D/(2*A),vc=-E/(2*C),k=1+D*D/(4*A)+E*E/(4*C),rx=Math.sqrt(k/A),ry=Math.sqrt(k/C);if(!(rx>0&&ry>0))continue;
-      let er=0;Q.forEach(q=>{er+=Math.abs(Math.hypot((q[0]-uc)/rx,(q[1]-vc)/ry)-1)});er/=n;
-      if(!best||er<best.er)best={er,th,uc,vc,rx,ry,Q}}
-    if(!best||best.er>.035||Math.max(best.rx,best.ry)<.15||Math.min(best.rx,best.ry)<.08||Math.max(best.rx,best.ry)/Math.min(best.rx,best.ry)>2.5)return null;
-    const{th,uc,vc,rx,ry,Q}=best;let sw=0,pa=Math.atan2((Q[0][1]-vc)/ry,(Q[0][0]-uc)/rx);const t0=pa;
-    for(let i=1;i<n;i++){const t=Math.atan2((Q[i][1]-vc)/ry,(Q[i][0]-uc)/rx);sw+=wr(t-pa);pa=t}
-    if(Math.abs(sw)<1||Math.abs(sw)>5.9)return null;
-    const N=Math.max(16,Math.round(Math.abs(sw)*14)),c=Math.cos(th),s=Math.sin(th),out=[];
-    for(let i=0;i<=N;i++){const t=t0+sw*i/N,u=uc+rx*Math.cos(t),v=vc+ry*Math.sin(t);out.push([mx+dg*(u*c-v*s),my+dg*(u*s+v*c)])}
-    return done(out)}
-  /* ∪ ∩ ⊂ ⊃: ضلعين مستقيمين متوازيين وقاع نص دايرة. tryU(Q,fin): Q = الرسمة وهي واقفة (مفتوحة لفوق)، fin(M) بيحوّل النموذج لمكانه الأصلي وبيفحص التغطية */
-  const tryU=(Q,fin)=>{let u0=1e9,u1=-1e9,vB=-1e9;Q.forEach(q=>{u0=Math.min(u0,q[0]);u1=Math.max(u1,q[0]);vB=Math.max(vB,q[1])});
-    const um=(u0+u1)/2,r0=(u1-u0)/2,SL=Q.filter(q=>q[0]<um&&q[1]<vB-r0*1.05),SR=Q.filter(q=>q[0]>=um&&q[1]<vB-r0*1.05);
-    if(SL.length<.08*n||SR.length<.08*n)return null;
-    const av=a=>a.reduce((s,q)=>s+q[0],0)/a.length,uL=av(SL),uR=av(SR),w=uR-uL;if(w<.12*dg)return null;
-    const r=w/2,cy=vB-r,uc=(uL+uR)/2,e0=Q[0],e1=Q[n-1],lo=e0[0]<e1[0]?e0:e1,hi=lo===e0?e1:e0,vt=(e0[1]+e1[1])/2,h=cy-vt;
-    if(h<.45*w||h>5*w||Math.abs(lo[0]-uL)>.35*w||Math.abs(hi[0]-uR)>.35*w)return null;
-    /* الضلعين لازم يكونوا مستقيمين فعلاً (وإلا هاد قوس C مش ∪): انحراف الخط المتوسط ≤ .03·dg */
-    const bs=[],lin=a=>{const N=a.length;let sv=0,su=0,svv=0,suv=0;a.forEach(q=>{sv+=q[1];su+=q[0];svv+=q[1]*q[1];suv+=q[0]*q[1]});const d=N*svv-sv*sv;if(Math.abs(d)<1e-14)return 1;const b=(N*suv-sv*su)/d,c=(su-b*sv)/N;bs.push(b);let m=0;a.forEach(q=>{m=Math.max(m,Math.abs(q[0]-c-b*q[1]))});return m};
-    if(lin(SL)>.03*dg||lin(SR)>.03*dg)return null;
-    const ns=Math.max(2,Math.round(h/(.02*dg))),M=[[uL,vt]];
-    for(let i=1;i<=ns;i++)M.push([uL,vt+h*i/ns]);
-    for(let i=1;i<=24;i++){const t=Math.PI*(1-i/24);M.push([uc+r*Math.cos(t),cy+r*Math.sin(t)])}
-    for(let i=1;i<=ns;i++)M.push([uR,cy-h*i/ns]);
-    if(e0===hi)M.reverse();
-    return fin(M,(bs[0]+bs[1])/2)};
-  /* الاتجاهات الأربعة بدون ميلان (متل قبل بالضبط) */
-  for(let k=0;k<4;k++){const X=tryU(P.map(q=>cvRot(q,k)),M=>{const Mo=M.map(q=>cvUnrot(q,k));return cover(Mo,.03*dg,P)>=.92?Mo:null});if(X)return done(X)}
-  /* v13.39: ∪ ∩ ⊂ ⊃ مايلين. المحور = من أبعد نقطة عن منتصف نهايتي الرسمة (قاع الشكل) لهالمنتصف (فتحة الشكل). بنلفّ الرسمة حوالين مركزها لحد ما يصير المحور لفوق وبنجرّب نفس النموذج (مع ±5° و±10° تعويضاً عن خطأ التقدير)، وبعد أول نجاح بتتصحّح الزاوية من ميل الضلعين الفعلي. ميلان ≤ SNAP (8°) درجة بيتنظّف لأقرب اتجاه من الأربعة، والأكبر بيضل مايل متل ما رسمته */
-  {const SNAP=8*Math.PI/180,H=Math.PI/2;let cx=0,cy0=0;P.forEach(q=>{cx+=q[0];cy0+=q[1]});cx/=n;cy0/=n;
-    const mxp=(P[0][0]+P[n-1][0])/2,myp=(P[0][1]+P[n-1][1])/2;let f=P[0],fd=-1;P.forEach(q=>{const d=Math.hypot(q[0]-mxp,q[1]-myp);if(d>fd){fd=d;f=q}});
-    const al=Math.atan2(myp-f[1],mxp-f[0]),R=(q,t)=>{const c=Math.cos(t),s=Math.sin(t),x=q[0]-cx,y=q[1]-cy0;return[cx+x*c-y*s,cy0+x*s+y*c]};
-    /* fin2: تغطية (سماح .02·dg، أضيق من الاتجاهات الأربعة عشان حرف C البيضوي ما ينقلب ∪ بالميلان) بالإطار الواقف + نقل النموذج لمكانه (بيتنظّف لأقرب اتجاه إذا الميلان ≤ SNAP) */
-    const fin2=(psi,Q)=>M=>{if(cover(M,.02*dg,Q)<.92)return null;const pc=Math.round(psi/H)*H;return M.map(q=>R(q,Math.abs(psi-pc)<=SNAP?pc:psi))};
-    for(const off of[0,.087,-.087,.175,-.175]){const psi=al+off+H,Q=P.map(q=>R(q,-psi));
-      /* بعد أول نجاح: بنصحّح الزاوية من ميل الضلعين الفعلي ونعيد، عشان قرار التنظيف (SNAP) يكون على الميلان الحقيقي مش المقدّر */
-      const X=tryU(Q,(M,bb)=>{const p2=psi-Math.atan(bb),Q2=P.map(q=>R(q,-p2));return tryU(Q2,fin2(p2,Q2))||fin2(psi,Q)(M)});if(X)return done(X)}}
-  /* حرف S: قوسين دائريين بدوران معاكس (كل قوس ≥160° عشان الموجة الناعمة ~ ما تنقلب S)، بيتقسّموا عند أحسن نقطة، وبنرجّعهم متماسّين (مماس مشترك) */
-  let best=null;for(let i=Math.round(.3*n);i<=Math.round(.7*n);i++){const A=circ(P.slice(0,i+1)),B=circ(P.slice(i));if(!A||!B)continue;const c=A.er*i+B.er*(n-i);if(!best||c<best.c)best={c,i,A,B}}
-  if(!best)return null;
-  const{i,A,B}=best,s1=swp(P.slice(0,i+1),A.cx,A.cy),s2=swp(P.slice(i),B.cx,B.cy),D=Math.hypot(A.cx-B.cx,A.cy-B.cy),rr=A.R/B.R;
-  if(!(A.er<.06&&B.er<.06&&s1*s2<0&&Math.abs(s1)>2.8&&Math.abs(s1)<5.2&&Math.abs(s2)>2.8&&Math.abs(s2)<5.2&&rr>.5&&rr<2&&D>.65*(A.R+B.R)&&D<1.35*(A.R+B.R)&&A.R>.03*dg&&B.R>.03*dg&&A.R<dg&&B.R<dg))return null;
-  const r=(A.R+B.R)/2,ux=(B.cx-A.cx)/D,uy=(B.cy-A.cy)/D,mx=(A.cx+B.cx)/2,my=(A.cy+B.cy)/2,c1=[mx-r*ux,my-r*uy],c2=[mx+r*ux,my+r*uy];
-  const nm=(d,s)=>{while(s>0&&d<=0)d+=T;while(s>0&&d>T)d-=T;while(s<0&&d>=0)d-=T;while(s<0&&d<-T)d+=T;return d};
-  const t0=Math.atan2(P[0][1]-c1[1],P[0][0]-c1[0]),d1=nm(Math.atan2(uy,ux)-t0,s1),t2=Math.atan2(-uy,-ux),d2=nm(Math.atan2(P[n-1][1]-c2[1],P[n-1][0]-c2[0])-t2,s2),out=[];
-  const N1=Math.max(10,Math.round(Math.abs(d1)*12)),N2=Math.max(10,Math.round(Math.abs(d2)*12));
-  for(let j=0;j<=N1;j++){const t=t0+d1*j/N1;out.push([c1[0]+r*Math.cos(t),c1[1]+r*Math.sin(t)])}
-  for(let j=1;j<=N2;j++){const t=t2+d2*j/N2;out.push([c2[0]+r*Math.cos(t),c2[1]+r*Math.sin(t)])}
-  return cover(out,.025*dg)>=.92?done(out):null}
 /* ===== v40: معاينة تنسيق الصفحة ===== */
 const PVA=1.1;
 function pvPage(t,kind,ttl){const mk0=(title,sub)=>Object.assign(tp(t,title,sub),{ar:PVA});
